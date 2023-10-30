@@ -1,8 +1,11 @@
-from typing import List
+from typing import List, Callable
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 from torch import Tensor
+import torchvision.transforms as T
+from PIL import Image
 
 import protonet as pn
 
@@ -30,9 +33,43 @@ class Encoder(nn.Module):
         return self.nn(x)
 
 
+class OmniGlotDataset(pn.ProtoDataset):
+    def __init__(self, transforms: Callable = None):
+        super().__init__()
+
+    def load_file(self, file_path: str):
+        return Image.open(file_path).convert('L')
+
+    @classmethod
+    def from_path(cls, folder_path: str, transforms: Callable = None):
+        # <folder_path>
+        #   /<super_class>
+        #       /<class>
+        #           /<img_file.png>
+        file_paths = list()
+        labels = list()
+        for img_file_path in Path(folder_path).rglob("*.png"):
+            file_paths.append(img_file_path)
+            *_, alphabet, character_index, _ = img_file_path.parts
+
+            labels.append(
+                pn.dataset.Label(
+                    name=alphabet + "-" + character_index,
+                    parent=alphabet,
+                )
+            )
+
+        return cls(file_paths, labels)
+
+
 def main():
     encoder = Encoder()
     model = pn.ProtoNet(encoder)
+    transform = T.Compose([
+        T.Resize((28, 28)),
+        T.ToTensor(),
+    ])
+
     train_config = pn.config.EpisodeConfig(
         num_episodes=2000,
         nc=60,              # 60 classes
@@ -46,8 +83,14 @@ def main():
         nq=1,               # 1 query per class
     )
 
-    train_ds = pn.dataset.ProtoDataset.from_path("omniglot/images_background")
-    test_ds = pn.dataset.ProtoDataset.from_path("omniglot/images_evaluation")
+    train_ds = OmniGlotDataset.from_path(
+        "data/omniglot/images_background",
+        transform=transform,
+    )
+    test_ds = OmniGlotDataset.from_path(
+        "data/omniglot/images_evaluation",
+        transform=transform,
+    )
 
     samplers = {}
 

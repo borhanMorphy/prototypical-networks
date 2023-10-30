@@ -5,8 +5,6 @@ import torch
 from torch.utils.data import DataLoader
 import lightning as L
 
-from .config import EpisodeConfig
-from .dataset import ProtoDataset
 from .sampler import EposideSampler
 from .model import ProtoNet
 
@@ -95,7 +93,7 @@ class ProtoTrainer():
     def validation(self, step: int = 0):
         self._run_single_stage("val", step=step)
 
-    def test(self):
+    def test(self, step: int = 0):
         self._run_single_stage("test", step=step)
 
     @torch.no_grad()

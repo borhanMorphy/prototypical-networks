@@ -1,8 +1,5 @@
-from typing import List
-
 from torch import Tensor
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class SquaredL2Distance(nn.Module):
