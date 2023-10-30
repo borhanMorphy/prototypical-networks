@@ -4,6 +4,8 @@
 
 <!-- TODO add badges -->
 
+<img src="/resources/prototypes.png"/>
+
 ## Contents
 
 - [Installation](#installation)
