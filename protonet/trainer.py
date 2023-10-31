@@ -28,7 +28,7 @@ class ProtoTrainer():
             precision="16-mixed",
             loggers=L.fabric.loggers.TensorBoardLogger(
                 root_dir=".",
-                name="omniglot_training",
+                name="runs",
             ),
         )
 

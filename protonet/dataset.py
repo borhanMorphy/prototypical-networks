@@ -23,13 +23,17 @@ class ProtoDataset(Dataset):
         self._file_paths = file_paths
         self._labels = labels
 
+        self._unq_labels = list(
+            set(map(lambda label: label.name, labels))
+        )
+
         self._label_to_idx = {
-            label.name: i
-            for i, label in enumerate(self._labels)
+            label: i
+            for i, label in enumerate(self._unq_labels)
         }
         self._idx_to_label = {
-            i: label.name
-            for i, label in enumerate(self._labels)
+            i: label
+            for i, label in enumerate(self._unq_labels)
         }
         self._label_idx_grouped_samples = defaultdict(list)
         for sample_idx, label in enumerate(self._labels):
@@ -46,7 +50,7 @@ class ProtoDataset(Dataset):
 
     @property
     def labels(self) -> List[str]:
-        return [self._idx_to_label[label_idx] for label_idx in self.label_ids]
+        return self._unq_labels
 
     @property
     def num_classes(self) -> int:

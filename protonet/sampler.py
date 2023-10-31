@@ -17,7 +17,7 @@ class EposideSampler(Sampler):
     ):
         assert nc <= ds.num_classes
         for label_idx in ds.label_ids:
-            assert ds.num_samples_for_cls(label_idx) >= (ns + nq)
+            assert ds.num_samples_for_cls(label_idx) >= (ns + nq), f"{ds.num_samples_for_cls(label_idx)} ?? {ns} {nq}"
 
         self.ds = ds
         self.num_episodes = num_episodes

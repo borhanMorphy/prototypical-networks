@@ -34,8 +34,6 @@ class Encoder(nn.Module):
 
 
 class OmniGlotDataset(pn.ProtoDataset):
-    def __init__(self, transforms: Callable = None):
-        super().__init__()
 
     def load_file(self, file_path: str):
         return Image.open(file_path).convert('L')
@@ -59,13 +57,13 @@ class OmniGlotDataset(pn.ProtoDataset):
                 )
             )
 
-        return cls(file_paths, labels)
+        return cls(file_paths, labels, transforms=transforms)
 
 
 def main():
     encoder = Encoder()
     model = pn.ProtoNet(encoder)
-    transform = T.Compose([
+    transforms = T.Compose([
         T.Resize((28, 28)),
         T.ToTensor(),
     ])
@@ -85,11 +83,11 @@ def main():
 
     train_ds = OmniGlotDataset.from_path(
         "data/omniglot/images_background",
-        transform=transform,
+        transforms=transforms,
     )
     test_ds = OmniGlotDataset.from_path(
         "data/omniglot/images_evaluation",
-        transform=transform,
+        transforms=transforms,
     )
 
     samplers = {}
