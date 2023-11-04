@@ -17,13 +17,14 @@ class ProtoTrainer():
         criterion,
         optimizer,
         num_epochs: int = 1,
-        # TODO add fabric args
+        fabric: L.Fabric = None,
+        scheduler = None,
     ):
         assert "train" in samplers
 
         self.samplers = samplers
         self.criterion = criterion
-        self.fabric = L.Fabric(
+        self.fabric = fabric or L.Fabric(
             accelerator="cuda",
             precision="16-mixed",
             loggers=L.fabric.loggers.TensorBoardLogger(
@@ -37,11 +38,7 @@ class ProtoTrainer():
             optimizer,
         )
 
-        self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer,
-            step_size=1,
-            gamma=0.5,
-        )
+        self.scheduler = scheduler
 
         self.dataloaders = {}
         for stage, sampler in self.samplers.items():
@@ -71,15 +68,16 @@ class ProtoTrainer():
 
         for epoch in range(self.num_epochs):
             self.model.train()
+            if self.scheduler:
+                self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
 
-            self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
             for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
                 self.optimizer.zero_grad()
 
                 logits = self.model.forward_train(
                     batch[:sampler.num_query_per_episode, :],
                     batch[-sampler.num_support_per_episode:, :].unflatten(
-                        dim=0, sizes=(sampler.ns, sampler.nc)
+                        dim=0, sizes=(sampler.nc, sampler.ns)
                     ),
                 )
                 loss = self.criterion(logits, targets)
@@ -87,7 +85,8 @@ class ProtoTrainer():
 
                 self.optimizer.step()
                 self.fabric.log("loss", loss.item(), step=i)
-            self.scheduler.step()
+            if self.scheduler:
+                self.scheduler.step()
             self.validation(step=epoch)
 
     def validation(self, step: int = 0):
@@ -119,9 +118,11 @@ class ProtoTrainer():
         losses= list()
         for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
             logits = self.model.forward_train(
+                # query_samples: (Nc * Nq) x *shape
                 batch[:sampler.num_query_per_episode, :],
+                # support_samples: Nc x Ns x *shape
                 batch[-sampler.num_support_per_episode:, :].unflatten(
-                    dim=0, sizes=(sampler.ns, sampler.nc)
+                    dim=0, sizes=(sampler.nc, sampler.ns)
                 ),
             )
             preds = logits.argmax(dim=0)
