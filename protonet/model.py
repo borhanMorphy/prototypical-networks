@@ -29,24 +29,24 @@ class ProtoNet(nn.Module):
         return self.encoder(x)
 
     def forward_train(self, query_samples: Tensor, support_samples: Tensor):
-        # query_samples: (Nq * Nc) x *shape
-        # support_samples: Ns x Nc x *shape
-        num_support_per_class, num_classes = support_samples.shape[:2]
+        # query_samples: (Nc * Nq) x *shape
+        # support_samples: Nc x Ns x *shape
+        num_classes, num_support_per_class = support_samples.shape[:2]
 
         query_features = self.forward(query_samples)
 
-        # query_features: (Nq * Nc) x d
+        # query_features: (Nc * Nq) x d
 
         proto_features = self.forward(
-            # Ns x Nc x *shape -> (Ns * Nc) x *shape
+            # Nc x Ns x *shape -> (Nc * Ns) x *shape
             support_samples.flatten(start_dim=0, end_dim=1)
         ).unflatten(
-            dim=0, sizes=(num_support_per_class, num_classes)
+            dim=0, sizes=(num_classes, num_support_per_class)
         )
-        # proto_features: Ns x Nc x d
+        # proto_features: Nc x Ns x d
 
-        # Ns x Nc x d -> Nc x d
-        proto_features = proto_features.mean(dim=0)
+        # Nc x Ns x d -> Nc x d
+        proto_features = proto_features.mean(dim=1)
 
         dists = self.dist_layer(query_features, proto_features)
         # dists: (Nc * Nq) x Nc
