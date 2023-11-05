@@ -113,6 +113,11 @@ def main():
         model.parameters(),
         lr=1e-3,
     )
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer,
+        step_size=1,
+        gamma=0.5,
+    )
 
     trainer = pn.ProtoTrainer(
         model,
@@ -120,6 +125,8 @@ def main():
         criterion,
         optimizer,
         num_epochs=1,
+        scheduler=scheduler,
+        num_workers="max",
     )
 
     trainer.run()

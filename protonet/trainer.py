@@ -1,4 +1,5 @@
-from typing import Dict, Literal
+from typing import Dict, Literal, Union
+from multiprocessing import cpu_count
 
 from tqdm import tqdm
 import torch
@@ -19,6 +20,7 @@ class ProtoTrainer():
         num_epochs: int = 1,
         fabric: L.Fabric = None,
         scheduler = None,
+        num_workers: Union[int, Literal["max"]] = 0,
     ):
         assert "train" in samplers
 
@@ -41,12 +43,16 @@ class ProtoTrainer():
         self.scheduler = scheduler
 
         self.dataloaders = {}
+
+        if num_workers == "max":
+            num_workers = cpu_count()
+
         for stage, sampler in self.samplers.items():
             self.dataloaders[stage] = self.fabric.setup_dataloaders(
                 DataLoader(
                     sampler.ds,
                     batch_sampler=sampler,
-                    num_workers=8,
+                    num_workers=num_workers,
                     pin_memory=True,
                 )
             )

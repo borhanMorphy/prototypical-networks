@@ -75,4 +75,7 @@ class ProtoDataset(Dataset):
             self._file_paths[index]
         )
 
-        return self._transforms(data)
+        if self._transforms:
+            return self._transforms(data)
+
+        return data
