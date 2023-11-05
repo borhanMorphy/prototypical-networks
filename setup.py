@@ -30,7 +30,7 @@ setup(
     # content type of long description
     long_description_content_type="text/markdown",
     # source code url for this package
-    url="https://github.com/borhanMorphy/protonet",
+    url="https://github.com/borhanMorphy/prototypical-networks",
     # author of the repository
     author=__author__["name"],
     # author's email adress
