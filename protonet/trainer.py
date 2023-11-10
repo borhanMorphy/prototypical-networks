@@ -131,7 +131,7 @@ class ProtoTrainer():
                     dim=0, sizes=(sampler.nc, sampler.ns)
                 ),
             )
-            preds = logits.argmax(dim=0)
+            preds = logits.argmax(dim=1)
             loss = self.criterion(logits, targets)
             acc.append((preds == targets).sum().item() / sampler.num_query_per_episode)
             losses.append(loss.item())

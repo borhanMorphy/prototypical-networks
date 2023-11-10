@@ -28,7 +28,7 @@ class ProtoNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self.encoder(x)
 
-    def forward_train(self, query_samples: Tensor, support_samples: Tensor):
+    def forward_train(self, query_samples: Tensor, support_samples: Tensor) -> Tensor:
         # query_samples: (Nc * Nq) x *shape
         # support_samples: Nc x Ns x *shape
         num_classes, num_support_per_class = support_samples.shape[:2]

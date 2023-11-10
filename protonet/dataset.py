@@ -11,6 +11,10 @@ class Label:
     name: str
     parent: Optional[str] = None
 
+    @property
+    def cls_name(self) -> str:
+        return f"{self.parent}:{self.name}" if self.parent else self.name
+
 
 class ProtoDataset(Dataset):
     def __init__(
@@ -24,7 +28,7 @@ class ProtoDataset(Dataset):
         self._labels = labels
 
         self._unq_labels = list(
-            set(map(lambda label: label.name, labels))
+            set(map(lambda label: label.cls_name, labels))
         )
 
         self._label_to_idx = {
@@ -37,7 +41,7 @@ class ProtoDataset(Dataset):
         }
         self._label_idx_grouped_samples = defaultdict(list)
         for sample_idx, label in enumerate(self._labels):
-            label_idx = self._label_to_idx[label.name]
+            label_idx = self._label_to_idx[label.cls_name]
             self._label_idx_grouped_samples[label_idx].append(
                 sample_idx
             )
