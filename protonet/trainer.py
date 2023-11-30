@@ -1,5 +1,7 @@
-from typing import Dict, Literal, Union
+from typing import Dict, Literal, Union, Optional, Tuple
 from multiprocessing import cpu_count
+import os
+import math
 
 from tqdm import tqdm
 import torch
@@ -21,6 +23,7 @@ class ProtoTrainer():
         fabric: L.Fabric = None,
         scheduler = None,
         num_workers: Union[int, Literal["max"]] = 0,
+        checkpoint_save_path: Optional[str] = None,
     ):
         assert "train" in samplers
 
@@ -57,6 +60,7 @@ class ProtoTrainer():
                 )
             )
         self.num_epochs = num_epochs
+        self.checkpoint_save_path = checkpoint_save_path or os.getcwd()
 
 
     def train(self):
@@ -72,12 +76,16 @@ class ProtoTrainer():
             sampler.nq,
         )
 
+        best_acc = 0
+
         for epoch in range(self.num_epochs):
             self.model.train()
             if self.scheduler:
                 self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
 
-            for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
+            loop = tqdm(enumerate(dataloader), total=sampler.num_episodes, leave=True)
+            offset = sampler.num_episodes * epoch
+            for i, batch in loop:
                 self.optimizer.zero_grad()
 
                 logits = self.model.forward_train(
@@ -90,21 +98,46 @@ class ProtoTrainer():
                 self.fabric.backward(loss)
 
                 self.optimizer.step()
-                self.fabric.log("loss", loss.item(), step=i)
+                self.fabric.log("loss", loss.item(), step=i + offset)
+
+                loop.set_description(f"Epoch [{epoch + 1}/{self.num_epochs}]")
+                loop.set_postfix(loss=loss.item())
+
             if self.scheduler:
                 self.scheduler.step()
-            self.validation(step=epoch)
 
-    def validation(self, step: int = 0):
-        self._run_single_stage("val", step=step)
+            current_val_loss, current_val_acc = self.validation(step=epoch)
 
-    def test(self, step: int = 0):
-        self._run_single_stage("test", step=step)
+            state = {
+                "model": self.model,
+                "optimizer": self.optimizer,
+                "scheduler": self.scheduler,
+                "accuracy": current_val_acc,
+                "loss": current_val_loss,
+            }
+
+            if current_val_acc > best_acc:
+                self.fabric.save(
+                    os.path.join(self.checkpoint_save_path, "best.ckpt"),
+                    state,
+                )
+                best_acc = current_val_acc
+
+            self.fabric.save(
+                os.path.join(self.checkpoint_save_path, "last.ckpt"),
+                state,
+            )
+
+    def validation(self, step: int = 0) -> Tuple[float, float]:
+        return self._run_single_stage("val", step=step)
+
+    def test(self, step: int = 0) -> Tuple[float, float]:
+        return self._run_single_stage("test", step=step)
 
     @torch.no_grad()
-    def _run_single_stage(self, stage: Literal["val", "test"], step: int = 0):
+    def _run_single_stage(self, stage: Literal["val", "test"], step: int = 0) -> Tuple[float, float]:
         if stage not in self.samplers:
-            return
+            return (math.inf, 0)
 
         self.model.eval()
 
@@ -121,7 +154,7 @@ class ProtoTrainer():
         )
 
         acc = list()
-        losses= list()
+        losses = list()
         for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
             logits = self.model.forward_train(
                 # query_samples: (Nc * Nq) x *shape
@@ -136,8 +169,13 @@ class ProtoTrainer():
             acc.append((preds == targets).sum().item() / sampler.num_query_per_episode)
             losses.append(loss.item())
 
-        self.fabric.log(f"{stage}/loss", sum(losses) / len(losses), step=step)
-        self.fabric.log(f"{stage}/accuracy", sum(acc) / len(acc), step=step)
+        loss = sum(losses) / len(losses)
+        acc = sum(acc) / len(acc)
+
+        self.fabric.log(f"{stage}/loss", loss, step=step)
+        self.fabric.log(f"{stage}/accuracy", acc, step=step)
+
+        return loss, acc
 
 
     def run(self):
