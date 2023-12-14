@@ -24,6 +24,7 @@ class EposideSampler(Sampler):
         self.nc = nc
         self.ns = ns
         self.nq = nq
+        self.alpha = 0
 
     @property
     def batch_size(self) -> int:

@@ -24,6 +24,7 @@ class ProtoTrainer():
         scheduler = None,
         num_workers: Union[int, Literal["max"]] = 0,
         checkpoint_save_path: Optional[str] = None,
+        curriculum_learning: bool = False,
     ):
         assert "train" in samplers
 
@@ -61,32 +62,27 @@ class ProtoTrainer():
             )
         self.num_epochs = num_epochs
         self.checkpoint_save_path = checkpoint_save_path or os.getcwd()
+        self.curriculum_learning = curriculum_learning
 
 
     def train(self):
         sampler = self.samplers["train"]
         dataloader = self.dataloaders["train"]
-
-        # no need to change targets, it would be same across all batches
-        targets = torch.arange(
-            sampler.nc,
-            dtype=torch.long,
-            device=self.fabric.device,
-        ).repeat_interleave(
-            sampler.nq,
-        )
-
         best_acc = 0
 
         for epoch in range(self.num_epochs):
             self.model.train()
             if self.scheduler:
                 self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
+            if self.curriculum_learning:
+                sampler.alpha = epoch
 
             loop = tqdm(enumerate(dataloader), total=sampler.num_episodes, leave=True)
             offset = sampler.num_episodes * epoch
             for i, batch in loop:
                 self.optimizer.zero_grad()
+
+                targets = self.get_targets(sampler)
 
                 logits = self.model.forward_train(
                     batch[:sampler.num_query_per_episode, :],
@@ -127,6 +123,15 @@ class ProtoTrainer():
                 os.path.join(self.checkpoint_save_path, "last.ckpt"),
                 state,
             )
+    
+    def get_targets(self, sampler: EposideSampler) -> torch.Tensor:
+        return torch.arange(
+            sampler.nc,
+            dtype=torch.long,
+            device=self.fabric.device,
+        ).repeat_interleave(
+            sampler.nq,
+        )
 
     def validation(self, step: int = 0) -> Tuple[float, float]:
         return self._run_single_stage("val", step=step)
@@ -144,18 +149,14 @@ class ProtoTrainer():
         sampler = self.samplers[stage]
         dataloader = self.dataloaders[stage]
 
-        # no need to change targets, it would be same across all batches
-        targets = torch.arange(
-            sampler.nc, # nc-way
-            dtype=torch.long,
-            device=self.fabric.device,
-        ).repeat_interleave(
-            sampler.nq, # nq query
-        )
+        if self.curriculum_learning:
+            sampler.alpha = step
 
         acc = list()
         losses = list()
         for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
+            targets = self.get_targets(sampler)
+            
             logits = self.model.forward_train(
                 # query_samples: (Nc * Nq) x *shape
                 batch[:sampler.num_query_per_episode, :],
