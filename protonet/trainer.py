@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 import lightning as L
 
-from .sampler import EposideSampler
+from .sampler import EpisodeSampler
 from .model import ProtoNet
 
 
@@ -16,7 +16,7 @@ class ProtoTrainer():
     def __init__(
         self,
         model: ProtoNet,
-        samplers: Dict[Literal["train", "val", "test"], EposideSampler],
+        samplers: Dict[Literal["train", "val", "test"], EpisodeSampler],
         criterion,
         optimizer,
         num_epochs: int = 1,
@@ -24,7 +24,6 @@ class ProtoTrainer():
         scheduler = None,
         num_workers: Union[int, Literal["max"]] = 0,
         checkpoint_save_path: Optional[str] = None,
-        curriculum_learning: bool = False,
     ):
         assert "train" in samplers
 
@@ -62,7 +61,6 @@ class ProtoTrainer():
             )
         self.num_epochs = num_epochs
         self.checkpoint_save_path = checkpoint_save_path or os.getcwd()
-        self.curriculum_learning = curriculum_learning
 
 
     def train(self):
@@ -74,8 +72,6 @@ class ProtoTrainer():
             self.model.train()
             if self.scheduler:
                 self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
-            if self.curriculum_learning:
-                sampler.alpha = epoch
 
             loop = tqdm(enumerate(dataloader), total=sampler.num_episodes, leave=True)
             offset = sampler.num_episodes * epoch
@@ -124,7 +120,7 @@ class ProtoTrainer():
                 state,
             )
     
-    def get_targets(self, sampler: EposideSampler) -> torch.Tensor:
+    def get_targets(self, sampler: EpisodeSampler) -> torch.Tensor:
         return torch.arange(
             sampler.nc,
             dtype=torch.long,
@@ -148,9 +144,6 @@ class ProtoTrainer():
 
         sampler = self.samplers[stage]
         dataloader = self.dataloaders[stage]
-
-        if self.curriculum_learning:
-            sampler.alpha = step
 
         acc = list()
         losses = list()

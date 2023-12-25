@@ -92,7 +92,7 @@ def main():
 
     samplers = {}
 
-    samplers["train"] = pn.sampler.EposideSampler(
+    samplers["train"] = pn.sampler.EpisodeSampler(
         train_ds,
         train_config.num_episodes,
         train_config.nc,
@@ -100,7 +100,7 @@ def main():
         train_config.nq,
     )
 
-    samplers["val"] = pn.sampler.EposideSampler(
+    samplers["val"] = pn.sampler.EpisodeSampler(
         test_ds,
         test_config.num_episodes,
         test_config.nc,
