@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class EpisodeConfig:
     # number of episode iterations
@@ -11,11 +12,12 @@ class EpisodeConfig:
     # number of query examples per class
     nq: int
 
-dataclass
+
+@dataclass
 class DynamicEpisodeConfig(EpisodeConfig):
     # initial scaling value
     scaling: int = 1
     # scaling formula
-    scaling_formula: str = 'scaling+0'
+    scaling_formula: str = "scaling+0"
     # percent formula
-    percent_formula: str = 'min(nc, scaling*parent)'
+    percent_formula: str = "min(nc, scaling*parent)"

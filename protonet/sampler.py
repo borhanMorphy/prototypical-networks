@@ -113,11 +113,6 @@ class DynamicEpisodeSampler(EpisodeSampler):
             list(self.parents[selected_parent]),
             k=self.nc,
         )
-        print(
-            selected_parent,
-            len(selected_labels),
-            len(list(self.parents[selected_parent])),
-        )
         query_sample_ids = []
         support_sample_ids = []
         for label in selected_labels:
