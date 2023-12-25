@@ -128,5 +128,5 @@ class DynamicEpisodeSampler(EpisodeSampler):
     def __iter__(self) -> Iterator[List[int]]:
         for _ in range(self.num_episodes):
             yield self.generate_episode()
-            eval_params = {"math": math, "self": self, "scaling": self.scaling}
-            self.scaling = eval(self.scaling_formula, eval_params)
+        eval_params = {"math": math, "self": self, "scaling": self.scaling}
+        self.scaling = eval(self.scaling_formula, eval_params)
