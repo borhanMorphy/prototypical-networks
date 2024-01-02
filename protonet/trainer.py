@@ -8,20 +8,20 @@ import torch
 from torch.utils.data import DataLoader
 import lightning as L
 
-from .sampler import EposideSampler
+from .sampler import EpisodeSampler
 from .model import ProtoNet
 
 
-class ProtoTrainer():
+class ProtoTrainer:
     def __init__(
         self,
         model: ProtoNet,
-        samplers: Dict[Literal["train", "val", "test"], EposideSampler],
+        samplers: Dict[Literal["train", "val", "test"], EpisodeSampler],
         criterion,
         optimizer,
         num_epochs: int = 1,
         fabric: L.Fabric = None,
-        scheduler = None,
+        scheduler=None,
         num_workers: Union[int, Literal["max"]] = 0,
         checkpoint_save_path: Optional[str] = None,
     ):
@@ -62,35 +62,28 @@ class ProtoTrainer():
         self.num_epochs = num_epochs
         self.checkpoint_save_path = checkpoint_save_path or os.getcwd()
 
-
     def train(self):
         sampler = self.samplers["train"]
         dataloader = self.dataloaders["train"]
-
-        # no need to change targets, it would be same across all batches
-        targets = torch.arange(
-            sampler.nc,
-            dtype=torch.long,
-            device=self.fabric.device,
-        ).repeat_interleave(
-            sampler.nq,
-        )
-
         best_acc = 0
 
         for epoch in range(self.num_epochs):
             self.model.train()
             if self.scheduler:
-                self.fabric.log("learning_rate", self.scheduler.get_last_lr()[0], step=epoch)
+                self.fabric.log(
+                    "learning_rate", self.scheduler.get_last_lr()[0], step=epoch
+                )
 
             loop = tqdm(enumerate(dataloader), total=sampler.num_episodes, leave=True)
             offset = sampler.num_episodes * epoch
             for i, batch in loop:
                 self.optimizer.zero_grad()
 
+                targets = self.get_targets(sampler)
+
                 logits = self.model.forward_train(
-                    batch[:sampler.num_query_per_episode, :],
-                    batch[-sampler.num_support_per_episode:, :].unflatten(
+                    batch[: sampler.num_query_per_episode, :],
+                    batch[-sampler.num_support_per_episode :, :].unflatten(
                         dim=0, sizes=(sampler.nc, sampler.ns)
                     ),
                 )
@@ -128,6 +121,15 @@ class ProtoTrainer():
                 state,
             )
 
+    def get_targets(self, sampler: EpisodeSampler) -> torch.Tensor:
+        return torch.arange(
+            sampler.nc,
+            dtype=torch.long,
+            device=self.fabric.device,
+        ).repeat_interleave(
+            sampler.nq,
+        )
+
     def validation(self, step: int = 0) -> Tuple[float, float]:
         return self._run_single_stage("val", step=step)
 
@@ -135,7 +137,9 @@ class ProtoTrainer():
         return self._run_single_stage("test", step=step)
 
     @torch.no_grad()
-    def _run_single_stage(self, stage: Literal["val", "test"], step: int = 0) -> Tuple[float, float]:
+    def _run_single_stage(
+        self, stage: Literal["val", "test"], step: int = 0
+    ) -> Tuple[float, float]:
         if stage not in self.samplers:
             return (math.inf, 0)
 
@@ -144,23 +148,16 @@ class ProtoTrainer():
         sampler = self.samplers[stage]
         dataloader = self.dataloaders[stage]
 
-        # no need to change targets, it would be same across all batches
-        targets = torch.arange(
-            sampler.nc, # nc-way
-            dtype=torch.long,
-            device=self.fabric.device,
-        ).repeat_interleave(
-            sampler.nq, # nq query
-        )
-
         acc = list()
         losses = list()
         for i, batch in tqdm(enumerate(dataloader), total=sampler.num_episodes):
+            targets = self.get_targets(sampler)
+
             logits = self.model.forward_train(
                 # query_samples: (Nc * Nq) x *shape
-                batch[:sampler.num_query_per_episode, :],
+                batch[: sampler.num_query_per_episode, :],
                 # support_samples: Nc x Ns x *shape
-                batch[-sampler.num_support_per_episode:, :].unflatten(
+                batch[-sampler.num_support_per_episode :, :].unflatten(
                     dim=0, sizes=(sampler.nc, sampler.ns)
                 ),
             )
@@ -176,7 +173,6 @@ class ProtoTrainer():
         self.fabric.log(f"{stage}/accuracy", acc, step=step)
 
         return loss, acc
-
 
     def run(self):
         self.train()

@@ -9,6 +9,7 @@ from PIL import Image
 
 import protonet as pn
 
+
 class Encoder(nn.Module):
     def __init__(self, features: List[int] = [1, 64, 64, 64, 64]):
         super().__init__()
@@ -34,9 +35,8 @@ class Encoder(nn.Module):
 
 
 class OmniGlotDataset(pn.ProtoDataset):
-
     def load_file(self, file_path: str):
-        return Image.open(file_path).convert('L')
+        return Image.open(file_path).convert("L")
 
     @classmethod
     def from_path(cls, folder_path: str, transforms: Callable = None):
@@ -63,22 +63,24 @@ class OmniGlotDataset(pn.ProtoDataset):
 def main():
     encoder = Encoder()
     model = pn.ProtoNet(encoder)
-    transforms = T.Compose([
-        T.Resize((28, 28)),
-        T.ToTensor(),
-    ])
+    transforms = T.Compose(
+        [
+            T.Resize((28, 28)),
+            T.ToTensor(),
+        ]
+    )
 
     train_config = pn.config.EpisodeConfig(
         num_episodes=2000,
-        nc=60,              # 60 classes
-        ns=1,               # 1-shot
-        nq=5,               # 5 query per class
+        nc=60,  # 60 classes
+        ns=1,  # 1-shot
+        nq=5,  # 5 query per class
     )
     test_config = pn.config.EpisodeConfig(
         num_episodes=1000,
-        nc=5,               # 5-way
-        ns=1,               # 1-shot
-        nq=1,               # 1 query per class
+        nc=5,  # 5-way
+        ns=1,  # 1-shot
+        nq=1,  # 1 query per class
     )
 
     train_ds = OmniGlotDataset.from_path(
@@ -92,7 +94,7 @@ def main():
 
     samplers = {}
 
-    samplers["train"] = pn.sampler.EposideSampler(
+    samplers["train"] = pn.sampler.EpisodeSampler(
         train_ds,
         train_config.num_episodes,
         train_config.nc,
@@ -100,7 +102,7 @@ def main():
         train_config.nq,
     )
 
-    samplers["val"] = pn.sampler.EposideSampler(
+    samplers["val"] = pn.sampler.EpisodeSampler(
         test_ds,
         test_config.num_episodes,
         test_config.nc,
@@ -132,5 +134,5 @@ def main():
     trainer.run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
