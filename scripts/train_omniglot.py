@@ -1,5 +1,7 @@
 from typing import List, Callable
 from pathlib import Path
+import random
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -70,44 +72,40 @@ def main():
         ]
     )
 
-    train_config = pn.config.EpisodeConfig(
+    config = pn.config.EpisodeConfig(
         num_episodes=2000,
         nc=60,  # 60 classes
         ns=1,  # 1-shot
         nq=5,  # 5 query per class
-    )
-    test_config = pn.config.EpisodeConfig(
-        num_episodes=1000,
-        nc=5,  # 5-way
-        ns=1,  # 1-shot
-        nq=1,  # 1 query per class
     )
 
     train_ds = OmniGlotDataset.from_path(
         "data/omniglot/images_background",
         transforms=transforms,
     )
-    test_ds = OmniGlotDataset.from_path(
+
+    val_ds = OmniGlotDataset.from_path(
         "data/omniglot/images_evaluation",
         transforms=transforms,
     )
 
-    samplers = {}
+    ids_to_pick = []
+    for label_idx in val_ds.label_ids:
+        ids = val_ds.get_samples_for_cls(label_idx)
+        ids_to_pick += random.sample(ids, k=config.ns)
 
-    samplers["train"] = pn.sampler.EpisodeSampler(
-        train_ds,
-        train_config.num_episodes,
-        train_config.nc,
-        train_config.ns,
-        train_config.nq,
+    support_ds = OmniGlotDataset(
+        file_paths=[val_ds._file_paths[idx] for idx in ids_to_pick],
+        labels=[deepcopy(val_ds._labels[idx]) for idx in ids_to_pick],
+        transforms=transforms,
     )
 
-    samplers["val"] = pn.sampler.EpisodeSampler(
-        test_ds,
-        test_config.num_episodes,
-        test_config.nc,
-        test_config.ns,
-        test_config.nq,
+    train_sampler = pn.sampler.EpisodeSampler(
+        train_ds,
+        config.num_episodes,
+        config.nc,
+        config.ns,
+        config.nq,
     )
 
     criterion = nn.CrossEntropyLoss()
@@ -123,11 +121,14 @@ def main():
 
     trainer = pn.ProtoTrainer(
         model,
-        samplers,
+        train_sampler,
         criterion,
         optimizer,
+        val_dataset=val_ds,
+        support_dataset=support_ds,
         num_epochs=1,
         scheduler=scheduler,
+        device="cpu",
         num_workers="max",
     )
 
