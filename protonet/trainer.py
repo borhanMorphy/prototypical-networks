@@ -159,6 +159,8 @@ class ProtoTrainer:
                 proto_points=proto_points,
                 step=epoch,
             )
+            self.fabric.log("val/loss", current_val_loss, step=epoch)
+            self.fabric.log("val/accuracy", current_val_acc, step=epoch)
 
             state = {
                 "model": self.model,

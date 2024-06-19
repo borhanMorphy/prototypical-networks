@@ -1,4 +1,4 @@
-from .model import ProtoNet
+from .model import ProtoNet, TapNet
 from .dataset import ProtoDataset
 from .trainer import ProtoTrainer
 from . import (
@@ -10,6 +10,7 @@ from .version import __version__
 
 __all__ = [
     "ProtoNet",
+    "TapNet",
     "ProtoDataset",
     "ProtoTrainer",
     "sampler",
