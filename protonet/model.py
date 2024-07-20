@@ -72,11 +72,28 @@ class TapNet(ProtoNet):
         ), "projection dimension + number of classes must be less than feature dimensions"
         super().__init__(encoder, dist_layer=dist_layer)
 
-        self.cls_ref_phi = nn.Linear(embed_dim, num_classes)
-        self.register_buffer("normalizer", torch.tensor(num_classes - 1))
+        self.register_parameter(
+            "cls_ref_phi",
+            nn.Parameter(
+                torch.zeros(num_classes, embed_dim).uniform_(
+                    -((1 / embed_dim) ** 0.5),
+                    (1 / embed_dim) ** 0.5,
+                ),
+                requires_grad=True,
+            ),
+        )
+        self.register_buffer(
+            "normalizer",
+            torch.tensor(num_classes - 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "M",
+            torch.zeros(embed_dim, project_dim),
+            persistent=True,
+        )
         self.project_dim = project_dim
         self.num_classes = num_classes
-        self.M = None
 
     def forward(self, x: Tensor) -> Tensor:
         return self.encoder(x) @ self.M
@@ -118,7 +135,7 @@ class TapNet(ProtoNet):
 
         query_features = query_features @ M
         # query_features: Nc x Ns x d_proj
-        ref_proto_features = self.cls_ref_phi.weight @ M
+        ref_proto_features = self.cls_ref_phi @ M
         # ref_proto_features: Nc x d_proj
 
         dists = self.dist_layer(query_features, ref_proto_features)
@@ -137,9 +154,8 @@ class TapNet(ProtoNet):
         Returns:
             Tensor: d_embed x d_proj
         """
-        cls_ref_phi = self.cls_ref_phi.weight
 
-        cls_ref_phi_hat = (self.num_classes * cls_ref_phi) - cls_ref_phi.sum(
+        cls_ref_phi_hat = (self.num_classes * self.cls_ref_phi) - self.cls_ref_phi.sum(
             dim=0, keepdims=True
         )
         cls_ref_phi_hat = cls_ref_phi_hat / self.normalizer
