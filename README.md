@@ -25,8 +25,8 @@ pip install .
 
 |     Name     | Extra Parameters |      Metric       |
 | :----------: | :--------------: | :---------------: |
-| **ProtoNet** |        No        | squared euclidian |
-|  **TapNet**  |       Yes        | squared euclidian |
+| **ProtoNet** |        No        | squared euclidean |
+|  **TapNet**  |       Yes        | squared euclidean |
 
 ## References
 
