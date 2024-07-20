@@ -124,10 +124,16 @@ class ProtoTrainer:
             self.model.train()
             if self.scheduler:
                 self.fabric.log(
-                    "learning_rate", self.scheduler.get_last_lr()[0], step=epoch
+                    "learning_rate",
+                    self.scheduler.get_last_lr()[0],
+                    step=epoch,
                 )
 
-            loop = tqdm(enumerate(dataloader), total=sampler.num_episodes, leave=True)
+            loop = tqdm(
+                enumerate(dataloader),
+                total=sampler.num_episodes,
+                leave=True,
+            )
             offset = sampler.num_episodes * epoch
             for i, (batch, _) in loop:
                 self.optimizer.zero_grad()

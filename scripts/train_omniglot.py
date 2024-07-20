@@ -2,12 +2,14 @@ from typing import List, Callable
 from pathlib import Path
 import random
 from copy import deepcopy
+import argparse
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 import torchvision.transforms as T
 from PIL import Image
+import lightning as L
 
 import protonet as pn
 
@@ -62,21 +64,31 @@ class OmniGlotDataset(pn.ProtoDataset):
         return cls(file_paths, labels, transforms=transforms)
 
 
-def main():
-    encoder = Encoder()
-    model = pn.ProtoNet(encoder)
+def main(args):
+
+    config = pn.config.EpisodeConfig(
+        num_episodes=args.num_episodes,
+        nc=args.num_classes,  # m classes
+        ns=args.num_support,  # k-shot
+        nq=args.num_query,  # n query per class
+    )
+
+    if args.model == "tapnet":
+        encoder = Encoder(features=[1, 64, 64, 64, 64 + config.nc])
+        model = pn.TapNet(
+            encoder,
+            embed_dim=64 + config.nc,
+            num_classes=config.nc,
+        )
+    elif args.model == "protonet":
+        encoder = Encoder(features=[1, 64, 64, 64, 64])
+        model = pn.ProtoNet(encoder)
+
     transforms = T.Compose(
         [
             T.Resize((28, 28)),
             T.ToTensor(),
         ]
-    )
-
-    config = pn.config.EpisodeConfig(
-        num_episodes=2000,
-        nc=60,  # 60 classes
-        ns=1,  # 1-shot
-        nq=5,  # 5 query per class
     )
 
     train_ds = OmniGlotDataset.from_path(
@@ -111,7 +123,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=1e-3,
+        lr=args.learning_rate,
     )
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer,
@@ -126,9 +138,10 @@ def main():
         optimizer,
         val_dataset=val_ds,
         support_dataset=support_ds,
-        num_epochs=1,
+        num_epochs=args.num_epochs,
         scheduler=scheduler,
-        device="cpu",
+        device=args.device,
+        root_dir="./logs/",
         num_workers="max",
     )
 
@@ -136,4 +149,27 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        choices=["tapnet", "protonet"],
+        default="protonet",
+    )
+    ap.add_argument("--device", type=str, default="cpu")
+    ap.add_argument("--seed", type=int, default=42)
+
+    ap.add_argument("--num-classes", "-nc", type=int, default=60)
+    ap.add_argument("--num-support", "-ns", type=int, default=1)
+    ap.add_argument("--num-query", "-nq", type=int, default=5)
+
+    ap.add_argument("--num-episodes", "-ep", type=int, default=2000)
+    ap.add_argument("--learning-rate", "-lr", type=float, default=1e-3)
+    ap.add_argument("--num-epochs", "-ne", type=int, default=10)
+
+    args = ap.parse_args()
+
+    L.seed_everything(args.seed)
+
+    main(args)
