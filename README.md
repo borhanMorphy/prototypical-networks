@@ -1,6 +1,6 @@
-# Prototypical Networks for Few-shot Learning
+# ProtoNet
 
-**&mdash; Unofficial PyTorch implementation of the NeurIPS 2017 paper**
+**&mdash; PyTorch implementations of the ProtoNet variations**
 
 <!-- TODO add badges -->
 
@@ -9,6 +9,7 @@
 ## Contents
 
 - [Installation](#installation)
+- [Supported ProtoNets](#supported-protonets)
 - [References](#references)
 - [Citations](#citations)
 
@@ -20,10 +21,24 @@ cd prototypical-networks
 pip install .
 ```
 
+## Supported ProtoNets
+
+|     Name     | Extra Parameters |      Metric       |
+| :----------: | :--------------: | :---------------: |
+| **ProtoNet** |        No        | squared euclidean |
+|  **TapNet**  |       Yes        | squared euclidean |
+
 ## References
+
+### ProtoNet
 
 - [Official Implementation](https://github.com/jakesnell/prototypical-networks)
 - [Paper](https://arxiv.org/pdf/1703.05175.pdf)
+
+### TapNet
+
+- [Official Implementation](https://github.com/istarjun/TapNet)
+- [Paper](https://arxiv.org/pdf/1905.06549.pdf)
 
 ## Citations
 
