@@ -23,10 +23,11 @@ pip install .
 
 ## Supported ProtoNets
 
-|     Name     | Extra Parameters |      Metric       |
-| :----------: | :--------------: | :---------------: |
-| **ProtoNet** |        No        | squared euclidean |
-|  **TapNet**  |       Yes        | squared euclidean |
+|       Name       | Extra Parameters |  Training Metric  | Inference Metric  |
+| :--------------: | :--------------: | :---------------: | :---------------: |
+|   **ProtoNet**   |        No        | squared euclidean | squared euclidean |
+| **SEN-ProtoNet** |        No        |        sen        |      cosine       |
+|    **TapNet**    |       Yes        | squared euclidean | squared euclidean |
 
 ## References
 
@@ -34,6 +35,10 @@ pip install .
 
 - [Official Implementation](https://github.com/jakesnell/prototypical-networks)
 - [Paper](https://arxiv.org/pdf/1703.05175.pdf)
+
+### SEN ProtoNet
+
+- [Paper](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123680120.pdf)
 
 ### TapNet
 

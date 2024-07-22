@@ -83,6 +83,15 @@ def main(args):
     elif args.model == "protonet":
         encoder = Encoder(features=[1, 64, 64, 64, 64])
         model = pn.ProtoNet(encoder)
+    elif args.model == "sen-protonet":
+        encoder = Encoder(features=[1, 64, 64, 64, 64])
+        dist_layer = pn.metric.SEN(
+            config.nc,
+            config.nq,
+            pos_epsilon=1.0,
+            neg_epsilon=-1e-7,
+        )
+        model = pn.SENProtoNet(encoder, dist_layer=dist_layer)
 
     transforms = T.Compose(
         [
@@ -154,7 +163,7 @@ if __name__ == "__main__":
         "--model",
         "-m",
         type=str,
-        choices=["tapnet", "protonet"],
+        choices=["tapnet", "protonet", "sen-protonet"],
         default="protonet",
     )
     ap.add_argument("--device", type=str, default="cpu")

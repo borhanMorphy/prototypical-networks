@@ -4,14 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SquaredL2Distance(nn.Module):
-    def forward(self, query: Tensor, source: Tensor) -> Tensor:
-        # query: N x d
-        # source: M x d
-        dists = (query.unsqueeze(1) - source.unsqueeze(0)).square().sum(dim=2)
-
-        # dists: N x M
-        return dists
+from .metric import (
+    SquaredL2Distance,
+    SEN,
+)
 
 
 class ProtoNet(nn.Module):
@@ -27,6 +23,15 @@ class ProtoNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.encoder(x)
+
+    def predict(self, x: Tensor, proto_points: Tensor) -> Tensor:
+        embeddings = self(x)
+        # embeddings: B x d
+
+        dists = self.dist_layer(embeddings, proto_points)
+        # dists: B x C
+
+        return dists.argmin(dim=1)
 
     def forward_train(
         self,
@@ -55,6 +60,38 @@ class ProtoNet(nn.Module):
 
         # convert distance to similarty by multiplying with -1
         return -dists
+
+
+class SENProtoNet(ProtoNet):
+
+    def __init__(
+        self,
+        encoder: nn.Module,
+        dist_layer: nn.Module = None,
+    ):
+        if not isinstance(dist_layer, SEN):
+            print(
+                "distance layer is not a subclass of `SEN` for SENProtoNet which wasn't expected"
+            )
+        super().__init__(encoder, dist_layer=dist_layer)
+
+    def predict(self, x: Tensor, proto_points: Tensor) -> Tensor:
+        embeddings = self(x)
+        # embeddings: B x d
+
+        sims = (
+            F.normalize(
+                embeddings,
+                dim=1,
+            )
+            @ F.normalize(
+                proto_points,
+                dim=1,
+            ).T
+        )
+        # sims: B x C
+
+        return sims.argmax(dim=1)
 
 
 class TapNet(ProtoNet):

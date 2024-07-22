@@ -1,4 +1,4 @@
-from typing import Literal, Union, Optional, Tuple
+from typing import Literal, Union, Optional
 from multiprocessing import cpu_count
 import os
 import math
@@ -161,19 +161,16 @@ class ProtoTrainer:
             proto_points: Tensor = self.compute_protopoints()
             # proto_points: C x d
 
-            current_val_loss, current_val_acc = self.validation(
+            current_val_acc = self.validation(
                 proto_points=proto_points,
                 step=epoch,
             )
-            self.fabric.log("val/loss", current_val_loss, step=epoch)
-            self.fabric.log("val/accuracy", current_val_acc, step=epoch)
 
             state = {
                 "model": self.model,
                 "optimizer": self.optimizer,
                 "scheduler": self.scheduler,
                 "accuracy": current_val_acc,
-                "loss": current_val_loss,
             }
 
             if current_val_acc > best_acc:
@@ -224,14 +221,14 @@ class ProtoTrainer:
         self,
         proto_points: Tensor,
         step: int = 0,
-    ) -> Tuple[float, float]:
+    ) -> float:
         return self._run_single_stage("val", proto_points, step=step)
 
     def test(
         self,
         proto_points: Tensor,
         step: int = 0,
-    ) -> Tuple[float, float]:
+    ) -> float:
         return self._run_single_stage("test", proto_points, step=step)
 
     @torch.no_grad()
@@ -240,7 +237,7 @@ class ProtoTrainer:
         stage: Literal["val", "test"],
         proto_points: Tensor,
         step: int = 0,
-    ) -> Tuple[float, float]:
+    ) -> float:
         """_summary_
 
         Args:
@@ -249,7 +246,7 @@ class ProtoTrainer:
             step (int, optional): _description_. Defaults to 0.
 
         Returns:
-            Tuple[float, float]: _description_
+            float: _description_
         """
         if stage not in self.dataloaders:
             return (math.inf, 0)
@@ -259,33 +256,22 @@ class ProtoTrainer:
         dataloader = self.dataloaders[stage]
 
         acc = list()
-        losses = list()
         for batch, targets in tqdm(
             dataloader, desc=f"running {stage} stage with step: {step}"
         ):
             batch_size = batch.shape[0]
 
-            embeddings = self.model(batch)
-            # embeddings: B x d
-
-            dists = self.model.dist_layer(embeddings, proto_points)
-            # dists: B x C
-
-            preds = dists.argmin(dim=1)
+            preds = self.model.predict(batch, proto_points)
             # preds: B,
 
-            # convert distance to similarty by multiplying with -1
             for i in range(batch_size):
-                losses.append(self.criterion(-dists[[i], :], targets[[i]]).item())
                 acc.append((preds[i] == targets[i]).item())
 
-        loss = sum(losses) / len(losses)
         acc = sum(acc) / len(acc)
 
-        self.fabric.log(f"{stage}/loss", loss, step=step)
         self.fabric.log(f"{stage}/accuracy", acc, step=step)
 
-        return loss, acc
+        return acc
 
     @torch.no_grad()
     def analyse_model(
